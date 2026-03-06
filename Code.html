@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Anime Boss 3D Game</title>
+<style>
+body{margin:0;overflow:hidden;background:black;font-family:sans-serif;}
+#ui{
+position:absolute;
+top:10px;
+left:10px;
+color:white;
+background:rgba(0,0,0,0.5);
+padding:10px;
+border-radius:10px;
+}
+button{
+padding:10px;
+margin-top:5px;
+font-size:16px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+<h2>⚔️ Anime Boss Battle</h2>
+
+<p>Gold: <span id="gold">0</span></p>
+<p>Weapon Level: <span id="weapon">1</span></p>
+<p>Boss HP: <span id="hp">200</span></p>
+
+<button onclick="attack()">Attack Boss</button>
+<button onclick="upgrade()">Upgrade Weapon (50 Gold)</button>
+
+<p id="msg"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+
+<script>
+
+let scene = new THREE.Scene();
+
+let camera = new THREE.PerspectiveCamera(
+75,
+window.innerWidth/window.innerHeight,
+0.1,
+1000
+);
+
+let renderer = new THREE.WebGLRenderer();
+
+renderer.setSize(window.innerWidth,window.innerHeight);
+
+document.body.appendChild(renderer.domElement);
+
+let light = new THREE.PointLight(0xffffff,2);
+light.position.set(5,5,5);
+scene.add(light);
+
+let floorGeo = new THREE.PlaneGeometry(20,20);
+let floorMat = new THREE.MeshStandardMaterial({color:0x222222});
+let floor = new THREE.Mesh(floorGeo,floorMat);
+
+floor.rotation.x = -Math.PI/2;
+
+scene.add(floor);
+
+let bossGeo = new THREE.BoxGeometry(2,2,2);
+let bossMat = new THREE.MeshStandardMaterial({color:0xff0000});
+let boss = new THREE.Mesh(bossGeo,bossMat);
+
+boss.position.y = 1;
+
+scene.add(boss);
+
+camera.position.z = 6;
+
+let bossHP = 200;
+let gold = 0;
+let weaponLevel = 1;
+
+function attack(){
+
+let damage = 10 * weaponLevel;
+
+bossHP -= damage;
+
+boss.rotation.y += 0.3;
+
+if(bossHP <=0){
+
+gold += 100;
+
+bossHP = 200;
+
+boss.material.color.set(Math.random()*0xffffff);
+
+show("Boss defeated! +100 gold");
+
+}
+
+update();
+
+}
+
+function upgrade(){
+
+if(gold >= 50){
+
+gold -= 50;
+
+weaponLevel++;
+
+show("Weapon upgraded!");
+
+}else{
+
+show("Not enough gold");
+
+}
+
+update();
+
+}
+
+function show(t){
+
+document.getElementById("msg").innerText = t;
+
+setTimeout(()=>{
+document.getElementById("msg").innerText="";
+},2000);
+
+}
+
+function update(){
+
+document.getElementById("hp").innerText = bossHP;
+
+document.getElementById("gold").innerText = gold;
+
+document.getElementById("weapon").innerText = weaponLevel;
+
+}
+
+function animate(){
+
+requestAnimationFrame(animate);
+
+boss.rotation.x += 0.01;
+
+renderer.render(scene,camera);
+
+}
+
+animate();
+
+update();
+
+</script>
+
+</body>
+</html>
