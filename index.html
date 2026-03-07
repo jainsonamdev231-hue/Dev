@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEXUS: Account Managed</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root { --p1: #00f3ff; --p2: #ff00f7; --bg: #080808; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Orbitron', sans-serif; height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+        /* --- SCREENS --- */
+        .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; position: absolute; }
+        .active { display: flex; }
+
+        .card { background: rgba(20,20,20,0.95); border: 2px solid var(--p1); padding: 30px; border-radius: 20px; text-align: center; box-shadow: 0 0 30px rgba(0,243,255,0.1); width: 300px; }
+        
+        input { background: #111; border: 1px solid #444; color: white; padding: 12px; border-radius: 8px; width: 80%; margin-bottom: 15px; text-align: center; font-family: 'Orbitron'; }
+        .btn { display: block; width: 100%; padding: 15px; margin: 5px 0; background: none; border: 1px solid var(--p1); color: var(--p1); border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .btn:hover { background: var(--p1); color: black; }
+
+        /* --- GAME UI --- */
+        .hub { position: absolute; width: 100%; max-width: 400px; padding: 10px; box-sizing: border-box; }
+        .top { top: 10px; transform: rotate(180deg); }
+        .bottom { bottom: 10px; }
+        .hp-bar { height: 12px; background: #111; border: 1px solid #333; border-radius: 6px; overflow: hidden; margin: 5px 0; }
+        .fill { height: 100%; width: 100%; transition: 0.5s; }
+        .moves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .m-btn { background: #000; border: 2px solid white; color: white; padding: 18px; border-radius: 12px; font-size: 1.5rem; }
+
+        #log { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 1.2rem; color: yellow; width: 80%; }
+        #back-home { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 100; border: 1px solid white; background: none; color: white; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: none;}
+    </style>
+</head>
+<body>
+
+    <button id="back-home" onclick="location.reload()">✖</button>
+
+    <div id="scr-login" class="screen active">
+        <div class="card">
+            <h2>NEXUS LOGIN</h2>
+            <input type="text" id="user-name" placeholder="Enter Username">
+            <button class="btn" onclick="saveUser()">INITIALIZE</button>
+        </div>
+    </div>
+
+    <div id="scr-menu" class="screen">
+        <div class="card">
+            <h3 id="welcome-msg">WELCOME</h3>
+            <button class="btn" onclick="startMode('OFFLINE')">🕹️ VS BOT</button>
+            <button class="btn" onclick="startMode('LOCAL')">⚔️ LOCAL 1V1</button>
+            <button class="btn" onclick="switchView('scr-online')">🌍 ONLINE</button>
+        </div>
+    </div>
+
+    <div id="scr-online" class="screen">
+        <div class="card">
+            <p>YOUR WORD ID:<br><b id="display-id" style="color:var(--p1)">...</b></p>
+            <input type="text" id="peer-target" placeholder="FRIEND'S WORD ID">
+            <button class="btn" onclick="connectOnline()">LINK SESSIONS</button>
+            <button class="btn" onclick="switchView('scr-menu')" style="border-color:gray; color:gray">BACK</button>
+        </div>
+    </div>
+
+    <div id="scr-game" class="screen">
+        <div id="p2-hub" class="hub top">
+            <div class="hp-bar"><div id="p2-fill" class="fill" style="background:var(--p2)"></div></div>
+            <div class="moves" id="p2-btns"><button class="m-btn" onclick="makeMove(2,'stone')">✊</button><button class="m-btn" onclick="makeMove(2,'paper')">✋</button><button class="m-btn" onclick="makeMove(2,'scissors')">✌️</button></div>
+        </div>
+        <div id="log">READY?</div>
+        <div class="hub bottom">
+            <div class="moves"><button class="m-btn" onclick="makeMove(1,'stone')">✊</button><button class="m-btn" onclick="makeMove(1,'paper')">✋</button><button class="m-btn" onclick="makeMove(1,'scissors')">✌️</button></div>
+            <div class="hp-bar"><div id="p1-fill" class="fill" style="background:var(--p1)"></div></div>
+        </div>
+    </div>
+
+<script>
+    let user = localStorage.getItem('nexusUser') || "";
+    let peer, conn, mode = "OFFLINE", p1HP = 100, p2HP = 100, p1M = null, p2M = null;
+
+    if(user) showMenu();
+
+    function saveUser() {
+        user = document.getElementById('user-name').value;
+        if(!user) return alert("Enter a name!");
+        localStorage.setItem('nexusUser', user);
+        showMenu();
+    }
+
+    function showMenu() {
+        document.getElementById('welcome-msg').innerText = "HELLO, " + user.toUpperCase();
+        switchView('scr-menu');
+        setupPeer();
+    }
+
+    function setupPeer() {
+        // Generates Word ID: Name + Random Word
+        const words = ["STRIKE","NEXUS","VOID","BLADE","TITAN","GHOST","PILOT","ZEAL"];
+        const wordID = user.toLowerCase() + "-" + words[Math.floor(Math.random()*words.length)];
+        document.getElementById('display-id').innerText = wordID.toUpperCase();
+        
+        peer = new Peer(wordID);
+        peer.on('connection', c => { conn = c; setupConn(); startMode('ONLINE'); });
+    }
+
+    function switchView(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('back-home').style.display = (id === 'scr-game') ? 'block' : 'none';
+    }
+
+    function startMode(m) {
+        mode = m; p1HP = 100; p2HP = 100;
+        document.getElementById('p2-btns').style.visibility = (m === 'LOCAL') ? 'visible' : 'hidden';
+        updateUI(); switchView('scr-game');
+    }
+
+    function connectOnline() {
+        const tid = document.getElementById('peer-target').value.toLowerCase();
+        conn = peer.connect(tid);
+        setupConn(); startMode('ONLINE');
+    }
+
+    function setupConn() {
+        conn.on('data', data => { p2M = data.move; check(); });
+    }
+
+    function makeMove(p, m) {
+        if(p === 1) { if(p1M) return; p1M = m; if(mode === 'ONLINE') conn.send({move: m}); }
+        else { if(p2M) return; p2M = m; }
+        if(mode === 'OFFLINE') p2M = ['stone','paper','scissors'][Math.floor(Math.random()*3)];
+        document.getElementById('log').innerText = "LOCKING...";
+        check();
+    }
+
+    function check() {
+        if(p1M && p2M) {
+            const r = {stone:'scissors', paper:'stone', scissors:'paper'};
+            let msg = (p1M === p2M) ? "CLASH!" : (r[p1M] === p2M ? (p2HP-=20, "HIT!") : (p1HP-=20, "OW!"));
+            document.getElementById('log').innerText = `${p1M} vs ${p2M}\n${msg}`;
+            updateUI(); p1M = null; p2M = null;
+        }
+    }
+
+    function updateUI() {
+        document.getElementById('p1-fill').style.width = p1HP + "%";
+        document.getElementById('p2-fill').style.width = p2HP + "%";
+        if(p1HP <= 0 || p2HP <= 1) { alert("MATCH OVER"); location.reload(); }
+    }
+</script>
+</body>
+</html>
